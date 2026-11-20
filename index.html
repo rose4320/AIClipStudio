@@ -30,7 +30,7 @@ function saveSelectedScene(){
 }
 const originalTab=tab;
 tab=function(name){originalTab(name);if(name==='script'){renderScenePicker();loadSelectedScene()}};
-$('sceneSelect').onchange=()=>{saveSelectedScene();const p=current();p.selectedSceneId=$('sceneSelect').value;persist();loadSelectedScene()};
+$('sceneSelect').onchange=()=>{const nextId=$('sceneSelect').value;const p=current();p.selectedSceneId=nextId;persist();loadSelectedScene()};
 $('newScene').onclick=()=>{saveSelectedScene();const p=current();const s={id:uid(),title:'新しいシーン',body:''};p.scenes.push(s);p.selectedSceneId=s.id;persist();renderScenePicker();loadSelectedScene()};
 $('deleteScene').onclick=()=>{const p=current();normalizeScenes(p);if(p.scenes.length<=1)return alert('最後のシーンは削除できません');if(!confirm('このシーンを削除しますか？'))return;p.scenes=p.scenes.filter(s=>s.id!==p.selectedSceneId);p.selectedSceneId=p.scenes[0].id;persist();renderScenePicker();loadSelectedScene()};
 $('saveScript').onclick=saveSelectedScene;
