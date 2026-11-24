@@ -105,3 +105,14 @@ manifestには形式識別子、スキーマバージョン、作成日時、各
 - 履歴Blobはアセット削除後も保持する仕様のため、現在のアセット一覧に存在しないassetIdの履歴も正常な履歴として許容する。
 - 実際の置換復元、事前退避、復元ジャーナル、staging store、起動時回復は未実装。
 - ブラウザでのTAR往復テスト、破損ファイル試験、iPad Safari実機試験は未実施。
+
+
+## 実装状況追記（2026-11-24）
+
+- IndexedDBをversion 3へ更新。既存の `images` / `assetImageVersions` storeを維持し、復元時の退避用 `restoreBackupImages` / `restoreBackupHistory` と `restoreJournal` を追加。
+- 完全バックアップTARの読み込み後、ユーザー確認を経て置換復元を開始する。
+- 置換前に現行Blobを同一IndexedDB readwrite transaction内で退避し、ジャーナルを記録してから現行storeを入れ替える。TAR内の画像はFile.slice()でBlobとして渡し、画像全体をArrayBufferへ一括展開しない。
+- IndexedDB更新完了後にlocalStorageの作品データを更新する。localStorage更新または確定処理に失敗した場合、退避storeから旧画像・履歴を戻し、旧作品JSONを復元する。
+- 起動時に未完了ジャーナルを検出した場合は旧状態へ回復してから作品画面を表示する。
+- 復元成功時のみ退避storeとジャーナルを削除する。
+- 現段階の静的JavaScript構文検査はPASS。ただし、ブラウザ実行、IndexedDB transactionの異常系、タブ終了・再起動後の回復、iPad Safari実機は未検証。実データでの運用前に必須の検証項目。
