@@ -167,25 +167,17 @@ try {
   // The one-shot failure allows rollback to write the old JSON successfully.
   const quotaContext = await browser.newContext();
   const quotaPage = await seedDestination(quotaContext, 'Quota destination asset');
-  await quotaPage.addInitScript(() => {
-    const original = Storage.prototype.setItem;
-    Storage.prototype.setItem = function(key, value) {
-      if (key === 'aiclip_v02' && window.__armQuotaFailure) {
-        window.__armQuotaFailure = false;
-        throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
-      }
-      return original.call(this, key, value);
-    };
-  });
-  // Reinstall the one-shot hook in this already loaded page.
+  // Override the specific Storage instance used by the app. This is more
+  // deterministic than changing Storage.prototype in an already-loaded page.
   await quotaPage.evaluate(() => {
-    const original = Storage.prototype.setItem;
-    Storage.prototype.setItem = function(key, value) {
+    const storage = window.localStorage;
+    const original = storage.setItem.bind(storage);
+    storage.setItem = function(key, value) {
       if (key === 'aiclip_v02' && window.__armQuotaFailure) {
         window.__armQuotaFailure = false;
         throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
       }
-      return original.call(this, key, value);
+      return original(key, value);
     };
     window.__armQuotaFailure = true;
   });
