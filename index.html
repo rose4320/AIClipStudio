@@ -333,18 +333,19 @@ $('mergeFile').onchange=async e=>{
 })();
 
 
-/* Stage 1: journaled full restore. Existing data is staged in IndexedDB before replacement. */
+
+/* Stage 1: journaled full restore. Existing data is staged before replacement. */
 (function installJournaledRestore(){
  const JOURNAL='active';
  function txDone(tx){return new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('IndexedDB transaction failed'));tx.onabort=()=>reject(tx.error||new Error('IndexedDB transaction aborted'))})}
- function cursorCopy(source,target,tx){
+ function copyCursor(source,target,tx,onDone){
    const req=source.openCursor();
-   req.onsuccess=()=>{const c=req.result;if(c){target.put(c.value,c.primaryKey);c.continue()}};
+   req.onsuccess=()=>{const c=req.result;if(c){target.put(c.value,c.primaryKey);c.continue()}else onDone()};
    req.onerror=()=>{try{tx.abort()}catch(e){}};
  }
- function cursorCopyHistory(source,target,tx){
+ function copyHistoryCursor(source,target,tx,onDone){
    const req=source.openCursor();
-   req.onsuccess=()=>{const c=req.result;if(c){target.put(c.value);c.continue()}};
+   req.onsuccess=()=>{const c=req.result;if(c){target.put(c.value);c.continue()}else onDone()};
    req.onerror=()=>{try{tx.abort()}catch(e){}};
  }
  async function rollback(){
@@ -355,13 +356,24 @@ $('mergeFile').onchange=async e=>{
    const tx=db.transaction(['images','assetImageVersions','restoreBackupImages','restoreBackupHistory','restoreJournal'],'readwrite');
    const images=tx.objectStore('images'),history=tx.objectStore('assetImageVersions');
    images.clear();history.clear();
-   cursorCopy(tx.objectStore('restoreBackupImages'),images,tx);
-   cursorCopyHistory(tx.objectStore('restoreBackupHistory'),history,tx);
-   tx.objectStore('restoreJournal').delete(JOURNAL);
-   tx.objectStore('restoreBackupImages').clear();
-   tx.objectStore('restoreBackupHistory').clear();
+   let remaining=2;
+   const done=()=>{
+     remaining--;
+     if(remaining===0){
+       tx.objectStore('restoreBackupImages').clear();
+       tx.objectStore('restoreBackupHistory').clear();
+     }
+   };
+   copyCursor(tx.objectStore('restoreBackupImages'),images,tx,done);
+   copyHistoryCursor(tx.objectStore('restoreBackupHistory'),history,tx,done);
    await txDone(tx);
-   if(typeof journal.oldData==='string')localStorage.setItem(KEY,journal.oldData);
+   if(typeof journal.oldData!=='string')throw new Error('復元前データの退避情報がありません');
+   localStorage.setItem(KEY,journal.oldData);
+   const clean=db.transaction(['restoreJournal','restoreBackupImages','restoreBackupHistory'],'readwrite');
+   clean.objectStore('restoreJournal').delete(JOURNAL);
+   clean.objectStore('restoreBackupImages').clear();
+   clean.objectStore('restoreBackupHistory').clear();
+   await txDone(clean);
    return true;
  }
  window.__aiclipRecoverRestore=async()=>{
@@ -381,16 +393,53 @@ $('mergeFile').onchange=async e=>{
    if(!result||!result.entries||!result.projectData)throw new Error('検証済みバックアップ情報がありません');
    const oldData=localStorage.getItem(KEY)||JSON.stringify(data);
    const manifest=result.manifest,entries=result.entries;
+   for(const [path,e] of entries){
+     if(e.kind==='history-image'&&(!Number.isSafeInteger(Number(e.versionId))||Number(e.versionId)<1))throw new Error('画像履歴のバージョンIDが不正です: '+path);
+   }
    const tx=db.transaction(['images','assetImageVersions','restoreBackupImages','restoreBackupHistory','restoreJournal'],'readwrite');
    const images=tx.objectStore('images'),history=tx.objectStore('assetImageVersions');
    const backupImages=tx.objectStore('restoreBackupImages'),backupHistory=tx.objectStore('restoreBackupHistory');
-   backupImages.clear();backupHistory.clear();images.clear();history.clear();
+   backupImages.clear();backupHistory.clear();
    tx.objectStore('restoreJournal').put({id:JOURNAL,oldData,startedAt:new Date().toISOString()});
-   cursorCopy(images,backupImages,tx);
-   cursorCopyHistory(history,backupHistory,tx);
-   // Cursor source must be the pre-clear backup source; copy existing records before clearing is handled below.
-   try{tx.abort()}catch(e){}
-   throw new Error('復元処理の安全性検査で停止しました。既存データは変更していません。');
+   let remaining=2;
+   const stageDone=()=>{
+     remaining--;
+     if(remaining!==0)return;
+     images.clear();history.clear();
+     for(const [path,e] of entries){
+       if(e.kind==='current-image'){
+         images.put(file.slice(e.start,e.start+e.size,e.mimeType||'application/octet-stream'),String(e.assetId));
+       }else if(e.kind==='history-image'){
+         history.put({versionId:Number(e.versionId),assetId:String(e.assetId),blob:file.slice(e.start,e.start+e.size,e.mimeType||'application/octet-stream'),savedAt:e.savedAt||new Date().toISOString(),reason:e.reason||'restored'});
+       }
+     }
+   };
+   copyCursor(images,backupImages,tx,stageDone);
+   copyHistoryCursor(history,backupHistory,tx,stageDone);
+   try{
+     await txDone(tx);
+   }catch(e){
+     throw new Error('復元データの準備に失敗しました。既存データは変更されていません。 '+(e.message||''));
+   }
+   try{
+     localStorage.setItem(KEY,JSON.stringify(result.projectData));
+   }catch(e){
+     try{await rollback()}catch(re){throw new Error('作品データ保存に失敗し、旧データへの自動回復も完了できませんでした。再読み込みして回復処理を実行してください。')}
+     throw new Error('作品データの保存容量が不足したため、旧データに戻しました。');
+   }
+   try{
+     const clean=db.transaction(['restoreJournal','restoreBackupImages','restoreBackupHistory'],'readwrite');
+     clean.objectStore('restoreJournal').delete(JOURNAL);
+     clean.objectStore('restoreBackupImages').clear();
+     clean.objectStore('restoreBackupHistory').clear();
+     await txDone(clean);
+   }catch(e){
+     try{await rollback()}catch(re){throw new Error('復元後の確定処理に失敗しました。再読み込みすると旧データへの回復を試みます。')}
+     throw new Error('復元の確定に失敗したため、旧データに戻しました。');
+   }
+   data=result.projectData;
+   $('saveStatus').textContent='バックアップ復元済み';
+   renderProjects();
  };
 })();
 
