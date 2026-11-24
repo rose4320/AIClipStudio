@@ -303,7 +303,7 @@ $('mergeFile').onchange=async e=>{
      }
      if(e.kind==='history-image'){
        const id=String(e.versionId);
-       if(path!=='images/history/'+id+'.blob'||historyIds.has(id)||!ids.has(String(e.assetId)))throw new Error('画像履歴の対応が不正です');
+       if(path!=='images/history/'+id+'.blob'||historyIds.has(id)||e.assetId===undefined||e.assetId===null)throw new Error('画像履歴の対応が不正です');
        historyIds.add(id);
      }
    }
