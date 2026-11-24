@@ -81,7 +81,11 @@ try {
 
   const restoredContext = await browser.newContext();
   const restored = await restoredContext.newPage();
-  restored.on('dialog', dialog => dialog.accept());
+  let restoredDialogMessage = '';
+  restored.on('dialog', dialog => {
+    restoredDialogMessage = dialog.message();
+    dialog.accept();
+  });
   await waitReady(restored);
   await restored.locator('[data-tab="assets"]').click();
   await restored.locator('#restoreFullBackupFile').setInputFiles({
@@ -99,16 +103,12 @@ try {
   // Corrupt the first TAR header byte; checksum validation must reject it without changing data.
   const corrupted = Buffer.from(archive);
   corrupted[0] = corrupted[0] === 0x58 ? 0x59 : 0x58;
-  let corruptionAlert = '';
-  restored.once('dialog', async dialog => {
-    corruptionAlert = dialog.message();
-    await dialog.accept();
-  });
+  restoredDialogMessage = '';
   await restored.locator('#restoreFullBackupFile').setInputFiles({
     name: 'corrupted.tar', mimeType: 'application/x-tar', buffer: corrupted
   });
   await restored.waitForFunction(() => document.querySelector('#saveStatus')?.textContent === 'バックアップ復元済み');
-  assert.match(corruptionAlert, /チェックサム/);
+  assert.match(restoredDialogMessage, /チェックサム/);
   const afterRejectedImport = await dbSnapshot(restored);
   assert.deepEqual(afterRejectedImport, afterRestore, 'invalid archive must not mutate IndexedDB');
   const afterRejectedData = await restored.evaluate(() => JSON.parse(localStorage.getItem('aiclip_v02')));
