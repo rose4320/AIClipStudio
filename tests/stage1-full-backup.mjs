@@ -170,26 +170,21 @@ try {
   // Override the specific Storage instance used by the app. This is more
   // deterministic than changing Storage.prototype in an already-loaded page.
   await quotaPage.evaluate(() => {
-    const storage = window.localStorage;
+    const descriptor = Object.getOwnPropertyDescriptor(Storage.prototype, 'setItem');
+    if (!descriptor || typeof descriptor.value !== 'function') throw new Error('Storage.prototype.setItem unavailable');
+    const original = descriptor.value;
     window.__quotaInjectionCount = 0;
-    Object.defineProperty(window, 'localStorage', {
+    Object.defineProperty(Storage.prototype, 'setItem', {
       configurable: true,
-      value: new Proxy(storage, {
-        get(target, property) {
-          if (property === 'setItem') {
-            return (key, value) => {
-              if (key === 'aiclip_v02' && window.__armQuotaFailure) {
-                window.__armQuotaFailure = false;
-                window.__quotaInjectionCount++;
-                throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
-              }
-              return target.setItem(key, value);
-            };
-          }
-          const value = Reflect.get(target, property, target);
-          return typeof value === 'function' ? value.bind(target) : value;
+      writable: true,
+      value: function(key, value) {
+        if (this === window.localStorage && key === 'aiclip_v02' && window.__armQuotaFailure) {
+          window.__armQuotaFailure = false;
+          window.__quotaInjectionCount++;
+          throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
         }
-      })
+        return original.call(this, key, value);
+      }
     });
     window.__armQuotaFailure = true;
   });
