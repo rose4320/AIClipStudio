@@ -171,14 +171,26 @@ try {
   // deterministic than changing Storage.prototype in an already-loaded page.
   await quotaPage.evaluate(() => {
     const storage = window.localStorage;
-    const original = storage.setItem.bind(storage);
-    storage.setItem = function(key, value) {
-      if (key === 'aiclip_v02' && window.__armQuotaFailure) {
-        window.__armQuotaFailure = false;
-        throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
-      }
-      return original(key, value);
-    };
+    window.__quotaInjectionCount = 0;
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: new Proxy(storage, {
+        get(target, property) {
+          if (property === 'setItem') {
+            return (key, value) => {
+              if (key === 'aiclip_v02' && window.__armQuotaFailure) {
+                window.__armQuotaFailure = false;
+                window.__quotaInjectionCount++;
+                throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
+              }
+              return target.setItem(key, value);
+            };
+          }
+          const value = Reflect.get(target, property, target);
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+      })
+    });
     window.__armQuotaFailure = true;
   });
   const quotaBefore = await dbSnapshot(quotaPage);
