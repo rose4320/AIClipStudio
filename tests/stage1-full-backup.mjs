@@ -119,7 +119,7 @@ try {
   // destination data must remain intact because the transaction is atomic.
   async function seedDestination(context, label) {
     const p = await context.newPage();
-    p.on('dialog', d => d.accept());
+    p.on('dialog', d => { void d.accept().catch(() => {}); });
     await waitReady(p);
     await p.locator('[data-tab="assets"]').click();
     await p.locator('#addAsset').click();
