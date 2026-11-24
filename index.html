@@ -185,7 +185,7 @@ $('mergeFile').onchange=async e=>{
      if(!Array.isArray(snapshot.projects)||!Array.isArray(snapshot.assets))throw new Error('作品データの形式が不正です');
      const stored=await readStores(),parts=[],manifest={
        format:'AIClipStudio-FullBackup',schemaVersion:1,createdAt:new Date().toISOString(),
-       appVersion:'0.4',indexedDB:{name:'AIClipStudioAssets',version:2},
+       appVersion:'0.4',indexedDB:{name:'AIClipStudioAssets',version:3},
        dataPath:'data/projects.json',entries:[],counts:{projects:snapshot.projects.length,assets:snapshot.assets.length,currentImages:0,historyImages:stored.history.length}
      };
      const imagePaths=new Set();
@@ -230,7 +230,7 @@ $('mergeFile').onchange=async e=>{
  const button=$('restoreFullBackup'),input=$('restoreFullBackupFile');
  if(!button||!input)return;
  button.disabled=false;
- button.textContent='完全バックアップを検証';
+ button.textContent='完全バックアップを復元';
  button.title='ファイルを検査し、復元予定の内容を表示します（この段階では復元しません）';
  const decoder=new TextDecoder('utf-8',{fatal:true});
  const MAX_ARCHIVE=1024*1024*1024,MAX_MANIFEST=8*1024*1024,MAX_DATA=64*1024*1024;
@@ -328,7 +328,7 @@ $('mergeFile').onchange=async e=>{
        tab('projects');
      }
    }catch(err){console.error(err);alert('バックアップを復元できませんでした。\\n'+(err.message||String(err))+'\\n\\n復元ジャーナルが残っている場合は、次回起動時に旧データへの回復を試みます。')}
-   finally{button.disabled=false;button.textContent='完全バックアップを検証';input.value=''}
+   finally{button.disabled=false;button.textContent='完全バックアップを復元';input.value=''}
  };
 })();
 
