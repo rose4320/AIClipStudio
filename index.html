@@ -289,6 +289,9 @@ $('mergeFile').onchange=async e=>{
      if(e.kind==='current-image'&&!/^images\/current\/[A-Za-z0-9_-]+\.blob$/.test(path))throw new Error('現行画像のパスが不正です');
      if(e.kind==='history-image'&&!/^images\/history\/[A-Za-z0-9_-]+\.blob$/.test(path))throw new Error('履歴画像のパスが不正です');
      if(!['project-data','current-image','history-image'].includes(e.kind))throw new Error('未知のファイル種別です');
+     // The restore phase needs both the TAR byte offset and the trusted manifest metadata.
+     // Merge only after the manifest/file size and path checks have passed.
+     entries.set(path,{...actual,...e,start:actual.start,size:actual.size});
    }
    const ids=new Set(),currentIds=new Set(),historyIds=new Set();
    for(const a of projectData.assets){
