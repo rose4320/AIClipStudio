@@ -1,6 +1,6 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>AIクリスタ 漫画スタジオ v0.4</title><style>:root{font-family:-apple-system,BlinkMacSystemFont,sans-serif;color:#202533;background:#f4f5f8}*{box-sizing:border-box}body{margin:0}header{background:#222b43;color:white;padding:15px 20px;display:flex;justify-content:space-between;align-items:center}main{max-width:1100px;margin:auto;padding:18px}nav{display:flex;gap:8px;overflow:auto;margin-bottom:18px}button{border:1px solid #cbd1dd;border-radius:10px;background:white;padding:11px 14px;font-size:15px;cursor:pointer}button.active,.primary{background:#4158a5;color:white;border-color:#4158a5}.panel{background:white;border:1px solid #e1e4ed;border-radius:16px;padding:20px;margin-bottom:15px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}input,textarea,select{width:100%;border:1px solid #cbd1dd;border-radius:9px;padding:11px;font:inherit;margin:7px 0 15px}textarea{min-height:130px;resize:vertical}label{font-weight:600;font-size:14px}.muted{color:#667085;font-size:13px}.hidden{display:none}.asset{border:1px solid #dce1ea;border-radius:12px;padding:13px}.asset img{width:100%;height:125px;object-fit:contain;background:#f3f4f7;border-radius:8px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:15px}.status{font-size:12px;color:#64748b}.pill{font-size:12px;background:#edf0f8;padding:4px 8px;border-radius:9px}#editorCanvas{width:100%;max-width:430px;aspect-ratio:4299/6071;border:1px solid #999;background:white;touch-action:none} .editor{display:flex;gap:16px;flex-wrap:wrap}.layers{min-width:180px;flex:1}.canvasWrap{flex:2;text-align:center;min-width:240px} .layer{display:flex;align-items:center;justify-content:space-between;border:1px solid #ddd;padding:8px;border-radius:8px;margin:6px 0} @media(max-width:600px){main{padding:10px}.panel{padding:13px}}</style></head><body><header><strong>AIクリスタ 漫画スタジオ <small>v0.4</small></strong><span id="saveStatus" class="status" style="color:#dce4ff">ローカル保存</span></header><main><nav><button data-tab="projects" class="active">作品</button><button data-tab="story">あらすじ</button><button data-tab="script">脚本</button><button data-tab="assets">アセット</button><button data-tab="editor">原稿編集</button></nav><section id="projects" class="panel"><h2>作品管理</h2><div class="toolbar"><button class="primary" id="newProject">＋ 新しい作品</button><button id="exportData">バックアップ書き出し</button><button id="importData">バックアップ読み込み（置換）</button><button class="primary" id="mergeData">データを追加・統合</button><input type="file" id="mergeFile" accept=".json,application/json" hidden><p class="muted">追加・統合は既存の作品を削除しません。取り込み前に内容を確認できます。ZIPは展開してJSONを選択してください。</p><input type="file" id="backupFile" accept="application/json" hidden></div><div id="projectList" class="grid"></div></section><section id="story" class="panel hidden"><h2>あらすじ</h2><label>作品タイトル</label><input id="title" placeholder="作品タイトル"><label>ジャンル</label><input id="genre" placeholder="ホラー、学園、SFなど"><label>世界観・テーマ</label><textarea id="world"></textarea><label>あらすじ</label><textarea id="synopsis" style="min-height:230px"></textarea><button class="primary" id="saveStory">保存</button><p class="muted">AIによる提案機能は今後接続。承認なしの自動書き換えは行いません。</p></section><section id="script" class="panel hidden"><h2>脚本・シナリオ</h2><label>話数・シーン名</label><input id="sceneTitle" placeholder="第1話・冒頭"><label>脚本</label><textarea id="sceneBody" style="min-height:290px" placeholder="場面、演出、セリフを入力"></textarea><button class="primary" id="saveScript">脚本を保存</button><div class="toolbar"><button id="newScene">＋ 新しい話・シーン</button><button id="deleteScene">選択中のシーンを削除</button></div><label>登録済みの話・シーン</label><select id="sceneSelect"></select><p class="muted">各話・シーンを別々に保存できます。</p></section><section id="assets" class="panel hidden"><h2>アセットライブラリ</h2><div class="toolbar"><button id="scopeProject" class="active">作品専用</button><button id="scopeShared">共通</button><button class="primary" id="addAsset">＋ アセット登録</button></div><div id="assetForm" class="hidden"><label>名前</label><input id="assetName" placeholder="例：主人公_制服_正面"><label>分類</label><select id="assetCategory"><option>キャラクター</option><option>背景</option><option>小物</option><option>衣装</option><option>表情・ポーズ</option><option>効果・トーン</option><option>吹き出し</option></select><label>設定・固定特徴</label><textarea id="assetNotes" placeholder="AIが維持すべき特徴を記入"></textarea><label>参照画像（任意）</label><input id="assetImage" type="file" accept="image/*"><button class="primary" id="saveAsset">登録する</button><button id="cancelAsset">キャンセル</button><input type="hidden" id="editingAssetId"><label>確認状態</label><select id="assetStatus"><option>設定要確認</option><option>承認済み</option><option>修正中</option></select><p class="muted">編集時は画像を選ばなければ既存画像を維持します。</p><p class="muted">画像は端末内のIndexedDBに保存します。容量制限に注意してください。</p></div><div class="toolbar"><button id="bulkAssetImages">画像をまとめて登録</button><input id="bulkAssetFiles" type="file" accept="image/*" multiple hidden></div><div id="assetList" class="grid"></div></section><section id="editor" class="panel hidden"><h2>5レイヤー原稿編集（試作）</h2><p class="muted">Apple Pencilで描画できます。原稿の出力解像度は4299×6071px。現段階は軽量プレビュー描画です。</p><div class="editor"><div class="layers"><h3>レイヤー</h3><div id="layerList"></div><label>ツール</label><select id="drawTool"><option value="pen">ペン</option><option value="eraser">消しゴム</option></select><label>線の太さ</label><input id="brushSize" type="range" min="1" max="30" value="4"><button id="undoStroke">1画戻す</button><button id="exportPreview">プレビューPNG出力</button></div><div class="canvasWrap"><canvas id="editorCanvas" width="860" height="1214"></canvas></div></div><p class="muted">この編集画面は試作です。コマ編集、吹き出しテンプレート、フル解像度PNG・ZIP出力、AI分離は未実装です。</p></section></main><script>
 const KEY='aiclip_v02';let db,assetScope='project',activeTab='projects',strokes=[],activeLayer='人物',drawing=false,currentStroke=null;const layerNames=['セリフ・吹き出し','効果・演出','コマ','人物','背景'];let visible=Object.fromEntries(layerNames.map(x=>[x,true]));let data={projects:[{id:'sample',title:'新しい漫画',genre:'',world:'',synopsis:'',sceneTitle:'第1話',sceneBody:''}],current:'sample',assets:[]};const $=id=>document.getElementById(id);const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now()+Math.random());function current(){return data.projects.find(p=>p.id===data.current)}function persist(){try{localStorage.setItem(KEY,JSON.stringify(data));$('saveStatus').textContent='保存済み'}catch(e){alert('保存できません。端末の空き容量を確認してください。')}}try{let saved=JSON.parse(localStorage.getItem(KEY));if(saved?.projects?.length)data=saved}catch(e){}function tab(name){activeTab=name;document.querySelectorAll('main>section').forEach(x=>x.classList.toggle('hidden',x.id!==name));document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('active',x.dataset.tab===name));if(name==='projects')renderProjects();if(name==='story'||name==='script')fillFields();if(name==='assets')renderAssets();if(name==='editor')renderEditor()}document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>tab(b.dataset.tab));function renderProjects(){let root=$('projectList');root.replaceChildren();data.projects.forEach(p=>{let el=document.createElement('div');el.className='asset';let h=document.createElement('h3');h.textContent=p.title||'無題の作品';let info=document.createElement('p');info.className='muted';info.textContent=p.genre||'ジャンル未設定';let btn=document.createElement('button');btn.textContent=p.id===data.current?'編集中':'この作品を開く';btn.onclick=()=>{data.current=p.id;persist();tab('story')};el.append(h,info,btn);root.append(el)})}function fillFields(){let p=current();['title','genre','world','synopsis','sceneTitle','sceneBody'].forEach(k=>$(k).value=p[k]||'')}function saveFields(){let p=current();['title','genre','world','synopsis','sceneTitle','sceneBody'].forEach(k=>p[k]=$(k).value);persist()}$('newProject').onclick=()=>{let name=prompt('作品名を入力','新しい漫画');if(name===null)return;let p={id:uid(),title:name.trim()||'無題の作品',genre:'',world:'',synopsis:'',sceneTitle:'第1話',sceneBody:''};data.projects.push(p);data.current=p.id;persist();tab('story')};$('saveStory').onclick=saveFields;$('saveScript').onclick=saveFields;['title','genre','world','synopsis','sceneTitle','sceneBody'].forEach(k=>$(k).addEventListener('change',saveFields));function download(blob,name){let a=document.createElement('a');let url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)}$('exportData').onclick=()=>download(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'aiclip-backup.json');$('importData').onclick=()=>$('backupFile').click();$('backupFile').onchange=async e=>{let f=e.target.files[0];if(!f)return;try{let x=JSON.parse(await f.text());if(!Array.isArray(x.projects)||!Array.isArray(x.assets))throw Error();if(confirm('現在の作品情報をバックアップの内容で置き換えますか？')){data=x;persist();tab('projects')}}catch(e){alert('バックアップ形式が正しくありません')}};
-function openDB(){return new Promise((resolve,reject)=>{let req=indexedDB.open('AIClipStudioAssets',1);req.onupgradeneeded=()=>req.result.createObjectStore('images');req.onsuccess=()=>{db=req.result;resolve()};req.onerror=()=>reject(req.error)})}function putImage(id,blob){return new Promise((resolve,reject)=>{let tx=db.transaction('images','readwrite');tx.objectStore('images').put(blob,id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}function getImage(id){return new Promise(resolve=>{if(!db)return resolve(null);let req=db.transaction('images').objectStore('images').get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>resolve(null)})}function setScope(s){assetScope=s;$('scopeProject').classList.toggle('active',s==='project');$('scopeShared').classList.toggle('active',s==='shared');renderAssets()}$('scopeProject').onclick=()=>setScope('project');$('scopeShared').onclick=()=>setScope('shared');
+function openDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open('AIClipStudioAssets',3);req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains('images'))d.createObjectStore('images');if(!d.objectStoreNames.contains('assetImageVersions'))d.createObjectStore('assetImageVersions',{keyPath:'versionId',autoIncrement:true});if(!d.objectStoreNames.contains('restoreBackupImages'))d.createObjectStore('restoreBackupImages');if(!d.objectStoreNames.contains('restoreBackupHistory'))d.createObjectStore('restoreBackupHistory',{keyPath:'versionId'});if(!d.objectStoreNames.contains('restoreJournal'))d.createObjectStore('restoreJournal',{keyPath:'id'})};req.onsuccess=()=>{db=req.result;db.onversionchange=()=>db.close();resolve()};req.onerror=()=>reject(req.error);req.onblocked=()=>reject(new Error('データベース更新が他のタブで待機中です'))})}function putImage(id,blob){return new Promise((resolve,reject)=>{if(!db)return reject(new Error('画像データベースが未接続です'));const tx=db.transaction(['images','assetImageVersions'],'readwrite');const images=tx.objectStore('images'),versions=tx.objectStore('assetImageVersions');const get=images.get(id);get.onsuccess=()=>{if(get.result){versions.add({assetId:id,blob:get.result,savedAt:new Date().toISOString(),reason:'image-replaced'})}images.put(blob,id)};tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('画像保存に失敗しました'));tx.onabort=()=>reject(tx.error||new Error('画像保存が中断されました'))})}function getImage(id){return new Promise(resolve=>{if(!db)return resolve(null);let req=db.transaction('images').objectStore('images').get(id);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>resolve(null)})}function deleteCurrentImage(id){return new Promise((resolve,reject)=>{if(!db)return resolve();const tx=db.transaction('images','readwrite');tx.objectStore('images').delete(id);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}function setScope(s){assetScope=s;$('scopeProject').classList.toggle('active',s==='project');$('scopeShared').classList.toggle('active',s==='shared');renderAssets()}$('scopeProject').onclick=()=>setScope('project');$('scopeShared').onclick=()=>setScope('shared');
 function resetAssetForm(){
  $('editingAssetId').value='';$('assetName').value='';$('assetNotes').value='';$('assetImage').value='';$('assetStatus').value='設定要確認';$('saveAsset').textContent='登録する';
 }
@@ -22,8 +22,10 @@ function editAsset(id){
  const a=data.assets.find(x=>x.id===id);if(!a)return;
  assetScope=a.scope;$('editingAssetId').value=id;$('assetName').value=a.name;$('assetCategory').value=a.category;$('assetNotes').value=a.notes||'';$('assetStatus').value=['設定要確認','承認済み','修正中'].includes(a.status)?a.status:'設定要確認';$('assetImage').value='';$('saveAsset').textContent='変更を保存';$('assetForm').classList.remove('hidden');$('assetForm').scrollIntoView({behavior:'smooth'});
 }
-function deleteAsset(id){
+async function deleteAsset(id){
  const a=data.assets.find(x=>x.id===id);if(!a||!confirm('「'+a.name+'」を削除しますか？'))return;
+ if(a.hasImage&&!db){alert('画像データベースに接続できないため削除を中止しました。再読み込み後にもう一度お試しください。');return}
+ try{if(a.hasImage)await deleteCurrentImage(id)}catch(e){alert('画像データを削除できなかったため、アセット情報は残しました。再読み込み後にもう一度お試しください。');return}
  data.assets=data.assets.filter(x=>x.id!==id);persist();renderAssets();
 }
 $('bulkAssetImages').onclick=()=>$('bulkAssetFiles').click();
@@ -40,7 +42,7 @@ $('bulkAssetFiles').onchange=async e=>{
  persist();renderAssets();e.target.value='';alert(count+'枚を登録しました');
 };
 async function renderAssets(){let root=$('assetList');root.replaceChildren();let list=data.assets.filter(a=>a.scope===assetScope&&(assetScope==='shared'||a.projectId===data.current));if(!list.length){let p=document.createElement('p');p.className='muted';p.textContent='まだアセットがありません。＋ アセット登録から追加してください。';root.append(p)}for(let a of list){let el=document.createElement('div');el.className='asset';if(a.hasImage){let blob=await getImage(a.id);if(blob){let img=document.createElement('img'),url=URL.createObjectURL(blob);img.src=url;img.onload=()=>URL.revokeObjectURL(url);el.append(img)}}let h=document.createElement('h3');h.textContent=a.name;let meta=document.createElement('p');meta.className='muted';meta.textContent=`${a.category} ・ ${a.status} ・ v${a.version}`;let note=document.createElement('p');note.textContent=a.notes||'';el.append(h,meta,note);let b=document.createElement('button');b.textContent=a.scope==='project'?'共通へコピー':'作品へコピー';b.onclick=async()=>{let id=uid();data.assets.push({...a,id,scope:a.scope==='project'?'shared':'project',projectId:a.scope==='project'?null:data.current});if(a.hasImage){let blob=await getImage(a.id);if(blob)await putImage(id,blob)}persist();alert('コピーしました')};el.append(b);let edit=document.createElement('button');edit.textContent='編集・画像差し替え';edit.onclick=()=>editAsset(a.id);el.append(edit);let del=document.createElement('button');del.textContent='削除';del.onclick=()=>deleteAsset(a.id);el.append(del);if(a.history?.length){let history=document.createElement('details');let summary=document.createElement('summary');summary.textContent='変更履歴（'+a.history.length+'件）';history.append(summary);for(const v of a.history){let line=document.createElement('p');line.className='muted';line.textContent='v'+v.version+' '+v.name+'：'+(v.notes||'');history.append(line)}el.append(history)}root.append(el)}}
-const canvas=$('editorCanvas'),ctx=canvas.getContext('2d');function renderEditor(){let root=$('layerList');root.replaceChildren();layerNames.forEach(n=>{let div=document.createElement('div');div.className='layer';let label=document.createElement('label');label.textContent=n;let eye=document.createElement('input');eye.type='checkbox';eye.checked=visible[n];eye.style.width='auto';eye.onchange=()=>{visible[n]=eye.checked;drawCanvas()};let radio=document.createElement('input');radio.type='radio';radio.name='layer';radio.style.width='auto';radio.checked=n===activeLayer;radio.onchange=()=>activeLayer=n;div.append(eye,label,radio);root.append(div)});drawCanvas()}function drawCanvas(){ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);for(let s of strokes){if(!visible[s.layer]||s.points.length<1)continue;ctx.strokeStyle=s.tool==='eraser'?'#fff':'#111';ctx.lineWidth=s.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();s.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(s.points.length===1)ctx.lineTo(s.points[0].x+.01,s.points[0].y+.01);ctx.stroke()}}function pos(e){let r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}canvas.onpointerdown=e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);drawing=true;currentStroke={layer:activeLayer,tool:$('drawTool').value,size:+$('brushSize').value,points:[pos(e)]};strokes.push(currentStroke);drawCanvas()};canvas.onpointermove=e=>{if(!drawing)return;currentStroke.points.push(pos(e));drawCanvas()};canvas.onpointerup=canvas.onpointercancel=()=>{drawing=false;currentStroke=null};$('undoStroke').onclick=()=>{strokes.pop();drawCanvas()};$('exportPreview').onclick=()=>canvas.toBlob(b=>b&&download(b,'manga-preview-860x1214.png'));openDB().catch(()=>{$('saveStatus').textContent='画像保存不可'});tab('projects');
+const canvas=$('editorCanvas'),ctx=canvas.getContext('2d');function renderEditor(){let root=$('layerList');root.replaceChildren();layerNames.forEach(n=>{let div=document.createElement('div');div.className='layer';let label=document.createElement('label');label.textContent=n;let eye=document.createElement('input');eye.type='checkbox';eye.checked=visible[n];eye.style.width='auto';eye.onchange=()=>{visible[n]=eye.checked;drawCanvas()};let radio=document.createElement('input');radio.type='radio';radio.name='layer';radio.style.width='auto';radio.checked=n===activeLayer;radio.onchange=()=>activeLayer=n;div.append(eye,label,radio);root.append(div)});drawCanvas()}function drawCanvas(){ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);for(let s of strokes){if(!visible[s.layer]||s.points.length<1)continue;ctx.strokeStyle=s.tool==='eraser'?'#fff':'#111';ctx.lineWidth=s.size;ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();s.points.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));if(s.points.length===1)ctx.lineTo(s.points[0].x+.01,s.points[0].y+.01);ctx.stroke()}}function pos(e){let r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}canvas.onpointerdown=e=>{e.preventDefault();canvas.setPointerCapture(e.pointerId);drawing=true;currentStroke={layer:activeLayer,tool:$('drawTool').value,size:+$('brushSize').value,points:[pos(e)]};strokes.push(currentStroke);drawCanvas()};canvas.onpointermove=e=>{if(!drawing)return;currentStroke.points.push(pos(e));drawCanvas()};canvas.onpointerup=canvas.onpointercancel=()=>{drawing=false;currentStroke=null};$('undoStroke').onclick=()=>{strokes.pop();drawCanvas()};$('exportPreview').onclick=()=>canvas.toBlob(b=>b&&download(b,'manga-preview-860x1214.png'));openDB().then(async()=>{if(window.__aiclipRecoverRestore)await window.__aiclipRecoverRestore();if(activeTab==='assets')renderAssets();$('saveStatus').textContent='保存領域準備完了';tab('projects')}).catch(e=>{$('saveStatus').textContent=db?'復元処理を停止しました':'画像保存不可';console.error('IndexedDB initialization/recovery failed',e);if(db){const gate=document.createElement('div');gate.setAttribute('role','alert');gate.style.cssText='position:fixed;inset:0;z-index:99999;background:#f4f5f8;display:flex;align-items:center;justify-content:center;padding:24px';const panel=document.createElement('div');panel.style.cssText='max-width:520px;background:white;border:1px solid #cbd1dd;border-radius:16px;padding:24px;box-shadow:0 8px 30px #0002';const title=document.createElement('h2');title.textContent='データ回復を完了できません';const message=document.createElement('p');message.textContent='安全のため編集機能を停止しました。ページを再読み込みして回復を再試行してください。繰り返し失敗する場合は、現在のブラウザデータを消去せず、サポートに連絡してください。';const retry=document.createElement('button');retry.textContent='ページを再読み込み';retry.onclick=()=>location.reload();panel.append(title,message,retry);gate.append(panel);document.body.append(gate)}else tab('projects')});
 
 /* v0.3: safe merge and multi-scene management. Retains v0.2 storage key. */
 function normalizeScenes(p){
@@ -112,9 +114,332 @@ $('mergeFile').onchange=async e=>{
  const file=e.target.files[0];if(!file)return;
  try{
    const x=JSON.parse(await file.text());validateImport(x);
-   const details='取り込み候補：作品 '+x.projects.length+'件、アセット '+x.assets.length+'件\\n既存作品は削除しません。タイトルが同じ作品は統合します。\\n既存の設定文は上書きせず、空欄だけ補完します。\\n画像ファイルは含まれません。\\n\\n続行しますか？';
+   const details='取り込み候補：作品 '+x.projects.length+'件、アセット '+x.assets.length+'件\n既存作品は削除しません。タイトルが同じ作品は統合します。\n既存の設定文は上書きせず、空欄だけ補完します。\n画像ファイルは含まれません。\n\n続行しますか？';
    if(confirm(details))importMerge(x);
  }catch(err){alert('JSONを読み込めません：'+err.message)}
  finally{e.target.value=''}
 };
+
+/* Stage 1: binary full-backup writer (TAR/USTAR). Existing JSON backup remains available. */
+(function installFullBackupExport(){
+ const toolbar=$('exportData')?.parentElement;
+ if(!toolbar||$('exportFullBackup'))return;
+ const btn=document.createElement('button');
+ btn.id='exportFullBackup';btn.textContent='完全バックアップ（画像・履歴込み）';
+ const input=document.createElement('input');
+ input.type='file';input.accept='.tar,application/x-tar';input.hidden=true;input.id='restoreFullBackupFile';
+ const restore=document.createElement('button');
+ restore.id='restoreFullBackup';restore.textContent='完全バックアップを復元';restore.disabled=true;
+ restore.title='復元機能は次の実装段階で有効になります';
+ toolbar.append(btn,restore,input);
+ const enc=new TextEncoder();
+ function tarOctal(value,length){
+   const s=Math.max(0,Number(value)||0).toString(8);
+   return (s.padStart(length-1,'0')+'\0').slice(-(length));
+ }
+ function tarHeader(path,size,mtime){
+   const nameBytes=enc.encode(path);
+   if(nameBytes.length>100)throw new Error('TAR内のファイル名が長すぎます: '+path);
+   const h=new Uint8Array(512),v=new DataView(h.buffer);
+   h.set(nameBytes,0);
+   h.set(enc.encode(tarOctal(0o644,8)),100);
+   h.set(enc.encode(tarOctal(0,8)),108);
+   h.set(enc.encode(tarOctal(0,8)),116);
+   h.set(enc.encode(tarOctal(size,12)),124);
+   h.set(enc.encode(tarOctal(Math.floor(mtime/1000),12)),136);
+   h.fill(32,148,156);
+   h[156]=48;
+   h.set(enc.encode('ustar\0'),257);
+   h.set(enc.encode('00'),263);
+   let sum=0;for(const b of h)sum+=b;
+   h.set(enc.encode(sum.toString(8).padStart(6,'0')+'\0 '),148);
+   return h;
+ }
+ function tarEntry(path,blob,mtime){
+   const pad=(512-(blob.size%512))%512;
+   return [tarHeader(path,blob.size,mtime),blob,new Uint8Array(pad)];
+ }
+ function readStores(){
+   return new Promise((resolve,reject)=>{
+     if(!db)return reject(new Error('画像データベースに接続できません。再読み込みしてください。'));
+     let tx;
+     try{tx=db.transaction(['images','assetImageVersions'],'readonly')}catch(e){reject(e);return}
+     const current=tx.objectStore('images'),history=tx.objectStore('assetImageVersions');
+     const keysReq=current.getAllKeys(),blobsReq=current.getAll(),historyReq=history.getAll();
+     let result={};
+     keysReq.onsuccess=()=>result.keys=keysReq.result;
+     blobsReq.onsuccess=()=>result.blobs=blobsReq.result;
+     historyReq.onsuccess=()=>result.history=historyReq.result;
+     tx.oncomplete=()=>{
+       if(!result.keys||!result.blobs||!result.history){reject(new Error('画像データの読み取り結果が不完全です'));return}
+       resolve(result);
+     };
+     tx.onerror=()=>reject(tx.error||new Error('画像データの読み取りに失敗しました'));
+     tx.onabort=()=>reject(tx.error||new Error('画像データの読み取りが中断されました'));
+   });
+ }
+ btn.onclick=async()=>{
+   btn.disabled=true;const old=btn.textContent;btn.textContent='バックアップを準備中…';
+   try{
+     const snapshot=JSON.parse(JSON.stringify(data));
+     if(!Array.isArray(snapshot.projects)||!Array.isArray(snapshot.assets))throw new Error('作品データの形式が不正です');
+     const stored=await readStores(),parts=[],manifest={
+       format:'AIClipStudio-FullBackup',schemaVersion:1,createdAt:new Date().toISOString(),
+       appVersion:'0.4',indexedDB:{name:'AIClipStudioAssets',version:3},
+       dataPath:'data/projects.json',entries:[],counts:{projects:snapshot.projects.length,assets:snapshot.assets.length,currentImages:0,historyImages:stored.history.length}
+     };
+     const imagePaths=new Set();
+     for(let i=0;i<stored.keys.length;i++){
+       const id=String(stored.keys[i]),blob=stored.blobs[i];
+       if(!/^[A-Za-z0-9_-]+$/.test(id))throw new Error('安全に保存できない画像IDがあります: '+id);
+       if(!(blob instanceof Blob))throw new Error('画像データがBlobではありません: '+id);
+       const path='images/current/'+id+'.blob';imagePaths.add(id);
+       manifest.entries.push({path,kind:'current-image',assetId:id,size:blob.size,mimeType:blob.type||'application/octet-stream'});
+       parts.push({path,blob});
+     }
+     const missing=snapshot.assets.filter(a=>a&&a.hasImage&&!imagePaths.has(String(a.id)));
+     if(missing.length)throw new Error('画像が見つからないアセットがあります（'+missing.length+'件）。データを変更せず中止しました。対象: '+missing.slice(0,5).map(a=>a.name||a.id).join('、'));
+     const historyIds=new Set();
+     for(const v of stored.history){
+       if(!v||v.versionId===undefined||v.versionId===null||!v.blob)throw new Error('画像履歴データに不正な項目があります');
+       const id=String(v.versionId);
+       if(!/^[A-Za-z0-9_-]+$/.test(id)||historyIds.has(id))throw new Error('画像履歴IDが不正または重複しています: '+id);
+       historyIds.add(id);
+       const path='images/history/'+id+'.blob';
+       manifest.entries.push({path,kind:'history-image',versionId:v.versionId,assetId:String(v.assetId),savedAt:v.savedAt||null,reason:v.reason||null,size:v.blob.size,mimeType:v.blob.type||'application/octet-stream'});
+       parts.push({path,blob:v.blob});
+     }
+     manifest.counts.currentImages=stored.keys.length;
+     const dataBlob=new Blob([JSON.stringify(snapshot)],{type:'application/json'});
+     manifest.entries.unshift({path:manifest.dataPath,kind:'project-data',size:dataBlob.size,mimeType:'application/json'});
+     const manifestBlob=new Blob([JSON.stringify(manifest,null,2)],{type:'application/json'});
+     const now=Date.now(),tarParts=[...tarEntry('manifest.json',manifestBlob,now)];
+     for(const p of [{path:manifest.dataPath,blob:dataBlob},...parts])tarParts.push(...tarEntry(p.path,p.blob,now));
+     tarParts.push(new Uint8Array(1024));
+     const archive=new Blob(tarParts,{type:'application/x-tar'});
+     download(archive,'aiclip-full-backup-'+new Date().toISOString().slice(0,10)+'.tar');
+     alert('完全バックアップを書き出しました。\n作品: '+manifest.counts.projects+'件\nアセット: '+manifest.counts.assets+'件\n現行画像: '+manifest.counts.currentImages+'件\n画像履歴: '+manifest.counts.historyImages+'件\nファイルサイズ: '+(archive.size/1024/1024).toFixed(1)+' MB');
+   }catch(err){console.error(err);alert('完全バックアップを作成できませんでした。\n'+(err.message||String(err)));}
+   finally{btn.disabled=false;btn.textContent=old}
+ };
+})();
+
+
+/* Stage 1: non-destructive TAR validation and restore preview. No writes are performed here. */
+(function installFullBackupPreflight(){
+ const button=$('restoreFullBackup'),input=$('restoreFullBackupFile');
+ if(!button||!input)return;
+ button.disabled=false;
+ button.textContent='完全バックアップを復元';
+ button.title='ファイルを検査し、復元予定の内容を表示します（この段階では復元しません）';
+ const decoder=new TextDecoder('utf-8',{fatal:true});
+ const MAX_ARCHIVE=1024*1024*1024,MAX_MANIFEST=8*1024*1024,MAX_DATA=64*1024*1024;
+ function octal(bytes,start,length){
+   const raw=decoder.decode(bytes.slice(start,start+length)).replace(/\0/g,'').trim();
+   if(!raw)return 0;
+   if(!/^[0-7]+$/.test(raw))throw new Error('TARヘッダーの数値が不正です');
+   const n=parseInt(raw,8);
+   if(!Number.isSafeInteger(n)||n<0)throw new Error('TARサイズが範囲外です');
+   return n;
+ }
+ async function parseTar(file){
+   if(file.size<1024||file.size>MAX_ARCHIVE)throw new Error('バックアップのサイズが対応範囲外です（最大1GB）');
+   let offset=0,zeroBlocks=0,entries=new Map(),manifest=null,projectData=null;
+   while(offset+512<=file.size){
+     const header=new Uint8Array(await file.slice(offset,offset+512).arrayBuffer());
+     if(header.every(b=>b===0)){zeroBlocks++;offset+=512;if(zeroBlocks===2)break;continue}
+     if(zeroBlocks)throw new Error('TAR終端ブロックが不正です');
+     const storedChecksum=octal(header,148,8),copy=header.slice();copy.fill(32,148,156);
+     let checksum=0;for(const b of copy)checksum+=b;
+     if(checksum!==storedChecksum)throw new Error('TARヘッダーのチェックサムが一致しません');
+     const name=decoder.decode(header.slice(0,100)).replace(/\0.*$/s,'');
+     const prefix=decoder.decode(header.slice(345,500)).replace(/\0.*$/s,'');
+     const path=prefix?prefix+'/'+name:name;
+     const type=header[156];
+     if(type!==0&&type!==48)throw new Error('通常ファイル以外を含むTARには対応していません');
+     if(!path||path.startsWith('/')||path.includes('..')||path.includes('\\')||entries.has(path))throw new Error('TAR内のパスが不正または重複しています');
+     const size=octal(header,124,12),dataStart=offset+512,dataEnd=dataStart+size;
+     if(dataEnd>file.size)throw new Error('TAR内のファイルが途中で切れています: '+path);
+     const item={path,size,start:dataStart};
+     entries.set(path,item);
+     if(path==='manifest.json'){
+       if(size>MAX_MANIFEST)throw new Error('manifestが大きすぎます');
+       manifest=JSON.parse(decoder.decode(await file.slice(dataStart,dataEnd).arrayBuffer()));
+     }else if(path==='data/projects.json'){
+       if(size>MAX_DATA)throw new Error('作品データJSONが大きすぎます');
+       projectData=JSON.parse(decoder.decode(await file.slice(dataStart,dataEnd).arrayBuffer()));
+     }
+     offset=dataStart+Math.ceil(size/512)*512;
+   }
+   if(zeroBlocks!==2)throw new Error('TAR終端マーカーがありません');
+   if(!manifest||manifest.format!=='AIClipStudio-FullBackup'||manifest.schemaVersion!==1)throw new Error('未対応のバックアップ形式またはバージョンです');
+   if(manifest.dataPath!=='data/projects.json'||!projectData)throw new Error('作品データが見つかりません');
+   if(!Array.isArray(manifest.entries)||!Array.isArray(projectData.projects)||!Array.isArray(projectData.assets))throw new Error('作品データまたはmanifestの構造が不正です');
+   const expected=new Map();
+   for(const e of manifest.entries){
+     if(!e||typeof e.path!=='string'||expected.has(e.path)||e.path==='manifest.json')throw new Error('manifest内のパスが不正または重複しています');
+     if(!Number.isSafeInteger(e.size)||e.size<0)throw new Error('manifestのサイズ情報が不正です');
+     expected.set(e.path,e);
+   }
+   if(entries.size!==expected.size+1)throw new Error('TAR内のファイル数とmanifestの記載が一致しません');
+   for(const [path,e] of expected){
+     const actual=entries.get(path);
+     if(!actual||actual.size!==e.size)throw new Error('ファイルが欠落しているかサイズが一致しません: '+path);
+     if(e.kind==='project-data'&&path!=='data/projects.json')throw new Error('作品データのパスが不正です');
+     if(e.kind==='current-image'&&!/^images\/current\/[A-Za-z0-9_-]+\.blob$/.test(path))throw new Error('現行画像のパスが不正です');
+     if(e.kind==='history-image'&&!/^images\/history\/[A-Za-z0-9_-]+\.blob$/.test(path))throw new Error('履歴画像のパスが不正です');
+     if(!['project-data','current-image','history-image'].includes(e.kind))throw new Error('未知のファイル種別です');
+     // The restore phase needs both the TAR byte offset and the trusted manifest metadata.
+     // Merge only after the manifest/file size and path checks have passed.
+     entries.set(path,{...actual,...e,start:actual.start,size:actual.size});
+   }
+   const ids=new Set(),currentIds=new Set(),historyIds=new Set();
+   for(const a of projectData.assets){
+     if(!a||typeof a.id!=='string'||ids.has(a.id))throw new Error('アセットIDが不正または重複しています');
+     ids.add(a.id);
+     if(a.hasImage&&!expected.has('images/current/'+a.id+'.blob'))throw new Error('作品データが参照する画像がありません: '+a.id);
+   }
+   for(const [path,e] of expected){
+     if(e.kind==='current-image'){
+       if(!ids.has(String(e.assetId))||path!=='images/current/'+e.assetId+'.blob'||currentIds.has(String(e.assetId)))throw new Error('現行画像とアセットの対応が不正です');
+       currentIds.add(String(e.assetId));
+     }
+     if(e.kind==='history-image'){
+       const id=String(e.versionId);
+       if(path!=='images/history/'+id+'.blob'||historyIds.has(id)||e.assetId===undefined||e.assetId===null)throw new Error('画像履歴の対応が不正です');
+       historyIds.add(id);
+     }
+   }
+   if(!expected.has('data/projects.json'))throw new Error('manifestに作品データの記録がありません');
+   const projectIds=new Set();
+   for(const p of projectData.projects){if(!p||typeof p.id!=='string'||projectIds.has(p.id))throw new Error('作品IDが不正または重複しています');projectIds.add(p.id)}
+   if(projectData.current&&!projectIds.has(projectData.current))throw new Error('現在選択中の作品IDが存在しません');
+   return {manifest,projectData,entries,counts:{projects:projectData.projects.length,assets:projectData.assets.length,currentImages:currentIds.size,historyImages:historyIds.size}};
+ }
+ button.onclick=()=>input.click();
+ input.onchange=async()=>{
+   const file=input.files&&input.files[0];if(!file)return;
+   button.disabled=true;button.textContent='バックアップを検証中…';
+   try{
+     const result=await parseTar(file),c=result.counts;
+     const currentCount={projects:data.projects.length,assets:data.assets.length};
+     const msg='バックアップを検証しました。\\n\\nファイル: '+file.name+'\\n作成日時: '+(result.manifest.createdAt||'不明')+'\\n復元する作品: '+c.projects+'件（現在 '+currentCount.projects+'件）\\nアセット: '+c.assets+'件（現在 '+currentCount.assets+'件）\\n現行画像: '+c.currentImages+'件\\n画像履歴: '+c.historyImages+'件\\nサイズ: '+(file.size/1024/1024).toFixed(1)+' MB\\n\\n現在のデータをこのバックアップ内容に置き換えます。復元前に旧データを退避します。続行しますか？';
+     if(confirm(msg)){
+       if(!window.__aiclipRestoreFullBackup)throw new Error('復元機能を初期化できません。ページを再読み込みしてください。');
+       await window.__aiclipRestoreFullBackup(file,result);
+       alert('完全バックアップを復元しました。作品・画像・履歴を確認してください。');
+       tab('projects');
+     }
+   }catch(err){console.error(err);alert('バックアップを復元できませんでした。\\n'+(err.message||String(err))+'\\n\\n復元ジャーナルが残っている場合は、次回起動時に旧データへの回復を試みます。')}
+   finally{button.disabled=false;button.textContent='完全バックアップを復元';input.value=''}
+ };
+})();
+
+
+
+/* Stage 1: journaled full restore. Existing data is staged before replacement. */
+(function installJournaledRestore(){
+ const JOURNAL='active';
+ function txDone(tx){return new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('IndexedDB transaction failed'));tx.onabort=()=>reject(tx.error||new Error('IndexedDB transaction aborted'))})}
+ function copyCursor(source,target,tx,onDone){
+   const req=source.openCursor();
+   req.onsuccess=()=>{const c=req.result;if(c){target.put(c.value,c.primaryKey);c.continue()}else onDone()};
+   req.onerror=()=>{try{tx.abort()}catch(e){}};
+ }
+ function copyHistoryCursor(source,target,tx,onDone){
+   const req=source.openCursor();
+   req.onsuccess=()=>{const c=req.result;if(c){target.put(c.value);c.continue()}else onDone()};
+   req.onerror=()=>{try{tx.abort()}catch(e){}};
+ }
+ async function rollback(){
+   const check=db.transaction('restoreJournal','readonly');
+   const journal=await new Promise((resolve,reject)=>{const r=check.objectStore('restoreJournal').get(JOURNAL);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)});
+   await txDone(check);
+   if(!journal)return false;
+   const tx=db.transaction(['images','assetImageVersions','restoreBackupImages','restoreBackupHistory','restoreJournal'],'readwrite');
+   const images=tx.objectStore('images'),history=tx.objectStore('assetImageVersions');
+   images.clear();history.clear();
+   let remaining=2;
+   // Keep the staged copies until both the IndexedDB rollback and localStorage rollback succeed.
+   // If localStorage restoration fails, the journal and staged copies must remain for the next launch.
+   const done=()=>{remaining--};
+   copyCursor(tx.objectStore('restoreBackupImages'),images,tx,done);
+   copyHistoryCursor(tx.objectStore('restoreBackupHistory'),history,tx,done);
+   await txDone(tx);
+   if(typeof journal.oldData!=='string')throw new Error('復元前データの退避情報がありません');
+   localStorage.setItem(KEY,journal.oldData);
+   const clean=db.transaction(['restoreJournal','restoreBackupImages','restoreBackupHistory'],'readwrite');
+   clean.objectStore('restoreJournal').delete(JOURNAL);
+   clean.objectStore('restoreBackupImages').clear();
+   clean.objectStore('restoreBackupHistory').clear();
+   await txDone(clean);
+   return true;
+ }
+ window.__aiclipRecoverRestore=async()=>{
+   const tx=db.transaction('restoreJournal','readonly');
+   const record=await new Promise((resolve,reject)=>{const r=tx.objectStore('restoreJournal').get(JOURNAL);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)});
+   await txDone(tx);
+   if(record){
+     $('saveStatus').textContent='復元前データを回復中…';
+     await rollback();
+     const old=JSON.parse(localStorage.getItem(KEY)||'null');
+     if(old&&Array.isArray(old.projects)&&Array.isArray(old.assets))data=old;
+     $('saveStatus').textContent='前回の復元を取り消し、旧データを回復しました';
+   }
+ };
+ window.__aiclipRestoreFullBackup=async(file,result)=>{
+   if(!db)throw new Error('IndexedDBに接続できません');
+   if(!result||!result.entries||!result.projectData)throw new Error('検証済みバックアップ情報がありません');
+   const oldData=localStorage.getItem(KEY)||JSON.stringify(data);
+   const manifest=result.manifest,entries=result.entries;
+   for(const [path,e] of entries){
+     if(e.kind==='history-image'&&(!Number.isSafeInteger(Number(e.versionId))||Number(e.versionId)<1))throw new Error('画像履歴のバージョンIDが不正です: '+path);
+   }
+   const tx=db.transaction(['images','assetImageVersions','restoreBackupImages','restoreBackupHistory','restoreJournal'],'readwrite');
+   const images=tx.objectStore('images'),history=tx.objectStore('assetImageVersions');
+   const backupImages=tx.objectStore('restoreBackupImages'),backupHistory=tx.objectStore('restoreBackupHistory');
+   backupImages.clear();backupHistory.clear();
+   tx.objectStore('restoreJournal').put({id:JOURNAL,oldData,startedAt:new Date().toISOString()});
+   let remaining=2;
+   const stageDone=()=>{
+     remaining--;
+     if(remaining!==0)return;
+     images.clear();history.clear();
+     for(const [path,e] of entries){
+       if(e.kind==='current-image'){
+         images.put(file.slice(e.start,e.start+e.size,e.mimeType||'application/octet-stream'),String(e.assetId));
+       }else if(e.kind==='history-image'){
+         history.put({versionId:Number(e.versionId),assetId:String(e.assetId),blob:file.slice(e.start,e.start+e.size,e.mimeType||'application/octet-stream'),savedAt:e.savedAt||new Date().toISOString(),reason:e.reason||'restored'});
+       }
+     }
+   };
+   copyCursor(images,backupImages,tx,stageDone);
+   copyHistoryCursor(history,backupHistory,tx,stageDone);
+   try{
+     await txDone(tx);
+   }catch(e){
+     throw new Error('復元データの準備に失敗しました。既存データは変更されていません。 '+(e.message||''));
+   }
+   try{
+     localStorage.setItem(KEY,JSON.stringify(result.projectData));
+   }catch(e){
+     try{await rollback()}catch(re){throw new Error('作品データ保存に失敗し、旧データへの自動回復も完了できませんでした。再読み込みして回復処理を実行してください。')}
+     throw new Error('作品データの保存容量が不足したため、旧データに戻しました。');
+   }
+   try{
+     const clean=db.transaction(['restoreJournal','restoreBackupImages','restoreBackupHistory'],'readwrite');
+     clean.objectStore('restoreJournal').delete(JOURNAL);
+     clean.objectStore('restoreBackupImages').clear();
+     clean.objectStore('restoreBackupHistory').clear();
+     await txDone(clean);
+   }catch(e){
+     try{await rollback()}catch(re){throw new Error('復元後の確定処理に失敗しました。再読み込みすると旧データへの回復を試みます。')}
+     throw new Error('復元の確定に失敗したため、旧データに戻しました。');
+   }
+   data=result.projectData;
+   $('saveStatus').textContent='バックアップ復元済み';
+   renderProjects();
+ };
+})();
+
 </script></body></html>
