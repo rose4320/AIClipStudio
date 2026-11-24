@@ -178,7 +178,7 @@ try {
       configurable: true,
       writable: true,
       value: function(key, value) {
-        if (this === window.localStorage && key === 'aiclip_v02' && window.__armQuotaFailure) {
+        if (key === 'aiclip_v02' && window.__armQuotaFailure) {
           window.__armQuotaFailure = false;
           window.__quotaInjectionCount++;
           throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
