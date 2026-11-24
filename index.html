@@ -224,4 +224,105 @@ $('mergeFile').onchange=async e=>{
  };
 })();
 
+
+/* Stage 1: non-destructive TAR validation and restore preview. No writes are performed here. */
+(function installFullBackupPreflight(){
+ const button=$('restoreFullBackup'),input=$('restoreFullBackupFile');
+ if(!button||!input)return;
+ button.disabled=false;
+ button.textContent='完全バックアップを検証';
+ button.title='ファイルを検査し、復元予定の内容を表示します（この段階では復元しません）';
+ const decoder=new TextDecoder('utf-8',{fatal:true});
+ const MAX_ARCHIVE=1024*1024*1024,MAX_MANIFEST=8*1024*1024,MAX_DATA=64*1024*1024;
+ function octal(bytes,start,length){
+   const raw=decoder.decode(bytes.slice(start,start+length)).replace(/\0/g,'').trim();
+   if(!raw)return 0;
+   if(!/^[0-7]+$/.test(raw))throw new Error('TARヘッダーの数値が不正です');
+   const n=parseInt(raw,8);
+   if(!Number.isSafeInteger(n)||n<0)throw new Error('TARサイズが範囲外です');
+   return n;
+ }
+ async function parseTar(file){
+   if(file.size<1024||file.size>MAX_ARCHIVE)throw new Error('バックアップのサイズが対応範囲外です（最大1GB）');
+   let offset=0,zeroBlocks=0,entries=new Map(),manifest=null,projectData=null;
+   while(offset+512<=file.size){
+     const header=new Uint8Array(await file.slice(offset,offset+512).arrayBuffer());
+     if(header.every(b=>b===0)){zeroBlocks++;offset+=512;if(zeroBlocks===2)break;continue}
+     if(zeroBlocks)throw new Error('TAR終端ブロックが不正です');
+     const storedChecksum=octal(header,148,8),copy=header.slice();copy.fill(32,148,156);
+     let checksum=0;for(const b of copy)checksum+=b;
+     if(checksum!==storedChecksum)throw new Error('TARヘッダーのチェックサムが一致しません');
+     const name=decoder.decode(header.slice(0,100)).replace(/\0.*$/s,'');
+     const prefix=decoder.decode(header.slice(345,500)).replace(/\0.*$/s,'');
+     const path=prefix?prefix+'/'+name:name;
+     const type=header[156];
+     if(type!==0&&type!==48)throw new Error('通常ファイル以外を含むTARには対応していません');
+     if(!path||path.startsWith('/')||path.includes('..')||path.includes('\\')||entries.has(path))throw new Error('TAR内のパスが不正または重複しています');
+     const size=octal(header,124,12),dataStart=offset+512,dataEnd=dataStart+size;
+     if(dataEnd>file.size)throw new Error('TAR内のファイルが途中で切れています: '+path);
+     const item={path,size,start:dataStart};
+     entries.set(path,item);
+     if(path==='manifest.json'){
+       if(size>MAX_MANIFEST)throw new Error('manifestが大きすぎます');
+       manifest=JSON.parse(decoder.decode(await file.slice(dataStart,dataEnd).arrayBuffer()));
+     }else if(path==='data/projects.json'){
+       if(size>MAX_DATA)throw new Error('作品データJSONが大きすぎます');
+       projectData=JSON.parse(decoder.decode(await file.slice(dataStart,dataEnd).arrayBuffer()));
+     }
+     offset=dataStart+Math.ceil(size/512)*512;
+   }
+   if(zeroBlocks!==2)throw new Error('TAR終端マーカーがありません');
+   if(!manifest||manifest.format!=='AIClipStudio-FullBackup'||manifest.schemaVersion!==1)throw new Error('未対応のバックアップ形式またはバージョンです');
+   if(manifest.dataPath!=='data/projects.json'||!projectData)throw new Error('作品データが見つかりません');
+   if(!Array.isArray(manifest.entries)||!Array.isArray(projectData.projects)||!Array.isArray(projectData.assets))throw new Error('作品データまたはmanifestの構造が不正です');
+   const expected=new Map();
+   for(const e of manifest.entries){
+     if(!e||typeof e.path!=='string'||expected.has(e.path)||e.path==='manifest.json')throw new Error('manifest内のパスが不正または重複しています');
+     if(!Number.isSafeInteger(e.size)||e.size<0)throw new Error('manifestのサイズ情報が不正です');
+     expected.set(e.path,e);
+   }
+   if(entries.size!==expected.size+1)throw new Error('TAR内のファイル数とmanifestの記載が一致しません');
+   for(const [path,e] of expected){
+     const actual=entries.get(path);
+     if(!actual||actual.size!==e.size)throw new Error('ファイルが欠落しているかサイズが一致しません: '+path);
+     if(e.kind==='project-data'&&path!=='data/projects.json')throw new Error('作品データのパスが不正です');
+     if(e.kind==='current-image'&&!/^images\/current\/[A-Za-z0-9_-]+\.blob$/.test(path))throw new Error('現行画像のパスが不正です');
+     if(e.kind==='history-image'&&!/^images\/history\/[A-Za-z0-9_-]+\.blob$/.test(path))throw new Error('履歴画像のパスが不正です');
+     if(!['project-data','current-image','history-image'].includes(e.kind))throw new Error('未知のファイル種別です');
+   }
+   const ids=new Set(),currentIds=new Set(),historyIds=new Set();
+   for(const a of projectData.assets){
+     if(!a||typeof a.id!=='string'||ids.has(a.id))throw new Error('アセットIDが不正または重複しています');
+     ids.add(a.id);
+     if(a.hasImage&&!expected.has('images/current/'+a.id+'.blob'))throw new Error('作品データが参照する画像がありません: '+a.id);
+   }
+   for(const [path,e] of expected){
+     if(e.kind==='current-image'){
+       if(!ids.has(String(e.assetId))||path!=='images/current/'+e.assetId+'.blob'||currentIds.has(String(e.assetId)))throw new Error('現行画像とアセットの対応が不正です');
+       currentIds.add(String(e.assetId));
+     }
+     if(e.kind==='history-image'){
+       const id=String(e.versionId);
+       if(path!=='images/history/'+id+'.blob'||historyIds.has(id)||!ids.has(String(e.assetId)))throw new Error('画像履歴の対応が不正です');
+       historyIds.add(id);
+     }
+   }
+   if(!expected.has('data/projects.json'))throw new Error('manifestに作品データの記録がありません');
+   const projectIds=new Set();
+   for(const p of projectData.projects){if(!p||typeof p.id!=='string'||projectIds.has(p.id))throw new Error('作品IDが不正または重複しています');projectIds.add(p.id)}
+   if(projectData.current&&!projectIds.has(projectData.current))throw new Error('現在選択中の作品IDが存在しません');
+   return {manifest,projectData,entries,counts:{projects:projectData.projects.length,assets:projectData.assets.length,currentImages:currentIds.size,historyImages:historyIds.size}};
+ }
+ button.onclick=()=>input.click();
+ input.onchange=async()=>{
+   const file=input.files&&input.files[0];if(!file)return;
+   button.disabled=true;button.textContent='バックアップを検証中…';
+   try{
+     const result=await parseTar(file),c=result.counts;
+     alert('バックアップの検証に成功しました。\\n\\nファイル: '+file.name+'\\n作成日時: '+(result.manifest.createdAt||'不明')+'\\n作品: '+c.projects+'件\\nアセット: '+c.assets+'件\\n現行画像: '+c.currentImages+'件\\n画像履歴: '+c.historyImages+'件\\nファイルサイズ: '+(file.size/1024/1024).toFixed(1)+' MB\\n\\n現在の作品データは変更していません。実際の復元機能は次の段階で実装します。');
+   }catch(err){console.error(err);alert('バックアップを検証できませんでした。\\n'+(err.message||String(err))+'\\n\\n現在の作品データは変更していません。')}
+   finally{button.disabled=false;button.textContent='完全バックアップを検証';input.value=''}
+ };
+})();
+
 </script></body></html>
