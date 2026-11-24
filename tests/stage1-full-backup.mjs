@@ -114,6 +114,88 @@ try {
   const afterRejectedData = await restored.evaluate(() => JSON.parse(localStorage.getItem('aiclip_v02')));
   assert.deepEqual(afterRejectedData, restoredProjectData, 'invalid archive must not mutate localStorage');
 
+
+  // Fault injection: abort the IndexedDB replacement transaction. The existing
+  // destination data must remain intact because the transaction is atomic.
+  async function seedDestination(context, label) {
+    const p = await context.newPage();
+    p.on('dialog', d => d.accept());
+    await waitReady(p);
+    await p.locator('[data-tab="assets"]').click();
+    await p.locator('#addAsset').click();
+    await p.locator('#assetName').fill(label);
+    await p.locator('#assetImage').setInputFiles({ name: 'destination.png', mimeType: 'image/png', buffer: pngA });
+    await p.locator('#saveAsset').click();
+    await p.getByText(label, { exact: true }).waitFor();
+    return p;
+  }
+
+  const abortContext = await browser.newContext();
+  const abortPage = await seedDestination(abortContext, 'Abort destination asset');
+  await abortPage.evaluate(() => {
+    const original = IDBDatabase.prototype.transaction;
+    IDBDatabase.prototype.transaction = function(storeNames, mode, options) {
+      const tx = original.call(this, storeNames, mode, options);
+      const names = Array.from(typeof storeNames === 'string' ? [storeNames] : storeNames);
+      if (window.__armRestoreAbort && mode === 'readwrite' &&
+          ['images','assetImageVersions','restoreBackupImages','restoreBackupHistory','restoreJournal'].every(n => names.includes(n))) {
+        window.__armRestoreAbort = false;
+        setTimeout(() => { try { tx.abort(); } catch (_) {} }, 0);
+      }
+      return tx;
+    };
+    window.__armRestoreAbort = true;
+  });
+  const abortBefore = await dbSnapshot(abortPage);
+  const abortDataBefore = await abortPage.evaluate(() => localStorage.getItem('aiclip_v02'));
+  await abortPage.locator('#restoreFullBackupFile').setInputFiles({
+    name: 'stage1-test.tar', mimeType: 'application/x-tar', buffer: archive
+  });
+  await abortPage.waitForFunction(() => document.querySelector('#saveStatus')?.textContent === '保存領域準備完了' ||
+    document.querySelector('#saveStatus')?.textContent === 'ローカル保存' ||
+    document.querySelector('#saveStatus')?.textContent === '保存済み', null, { timeout: 15000 });
+  assert.deepEqual(await dbSnapshot(abortPage), abortBefore, 'aborted IndexedDB replacement must preserve destination blobs');
+  assert.equal(await abortPage.evaluate(() => localStorage.getItem('aiclip_v02')), abortDataBefore,
+    'aborted IndexedDB replacement must preserve destination project data');
+  await abortContext.close();
+
+  // Fault injection: simulate localStorage quota exhaustion exactly once.
+  // The one-shot failure allows rollback to write the old JSON successfully.
+  const quotaContext = await browser.newContext();
+  const quotaPage = await seedDestination(quotaContext, 'Quota destination asset');
+  await quotaPage.addInitScript(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (key === 'aiclip_v02' && window.__armQuotaFailure) {
+        window.__armQuotaFailure = false;
+        throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
+      }
+      return original.call(this, key, value);
+    };
+  });
+  // Reinstall the one-shot hook in this already loaded page.
+  await quotaPage.evaluate(() => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+      if (key === 'aiclip_v02' && window.__armQuotaFailure) {
+        window.__armQuotaFailure = false;
+        throw new DOMException('Injected quota exhaustion', 'QuotaExceededError');
+      }
+      return original.call(this, key, value);
+    };
+    window.__armQuotaFailure = true;
+  });
+  const quotaBefore = await dbSnapshot(quotaPage);
+  const quotaDataBefore = await quotaPage.evaluate(() => localStorage.getItem('aiclip_v02'));
+  await quotaPage.locator('#restoreFullBackupFile').setInputFiles({
+    name: 'stage1-test.tar', mimeType: 'application/x-tar', buffer: archive
+  });
+  await quotaPage.waitForFunction(() => document.querySelector('#saveStatus')?.textContent !== 'バックアップ復元中…', null, { timeout: 15000 }).catch(() => {});
+  assert.deepEqual(await dbSnapshot(quotaPage), quotaBefore, 'quota failure must roll back destination blobs');
+  assert.equal(await quotaPage.evaluate(() => localStorage.getItem('aiclip_v02')), quotaDataBefore,
+    'quota failure must restore destination project JSON');
+  await quotaContext.close();
+
   console.log(JSON.stringify({
     result: 'PASS',
     checks: [
@@ -121,7 +203,9 @@ try {
       'full TAR export',
       'full TAR restore in a clean browser context',
       'current image and history Blob round-trip',
-      'corrupt TAR checksum rejected without mutation'
+      'corrupt TAR checksum rejected without mutation',
+      'IndexedDB replacement transaction abort preserves destination data',
+      'localStorage quota failure rolls back to destination data'
     ],
     beforeExport,
     afterRestore
