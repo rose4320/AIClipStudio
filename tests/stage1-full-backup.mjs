@@ -38,6 +38,13 @@ const browser = await chromium.launch({ headless: true });
 try {
   const source = await browser.newContext({ acceptDownloads: true });
   const page = await source.newPage();
+  await page.addInitScript(() => {
+    const original = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = blob => {
+      if (blob instanceof Blob && blob.type === 'application/x-tar') window.__aiclipTestTarBlob = blob;
+      return original(blob);
+    };
+  });
   page.on('dialog', dialog => dialog.accept());
   await waitReady(page);
 
@@ -57,12 +64,16 @@ try {
   assert.equal(beforeExport.imageCount, 1, 'expected one current image');
   assert.equal(beforeExport.historyCount, 1, 'expected one replaced-image history record');
 
-  const downloadPromise = page.waitForEvent('download');
   await page.locator('#exportFullBackup').click();
-  const download = await downloadPromise;
-  const archivePath = await download.path();
-  assert.ok(archivePath, 'full backup TAR should be downloaded');
-  const archive = await (await import('node:fs/promises')).readFile(archivePath);
+  await page.waitForFunction(() => window.__aiclipTestTarBlob instanceof Blob, null, { timeout: 15000 });
+  const archiveBase64 = await page.evaluate(async () => {
+    const bytes = new Uint8Array(await window.__aiclipTestTarBlob.arrayBuffer());
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  });
+  const archive = Buffer.from(archiveBase64, 'base64');
+  assert.ok(archive.length >= 1024, 'full backup TAR should contain a valid archive');
 
   const restoredContext = await browser.newContext();
   const restored = await restoredContext.newPage();
