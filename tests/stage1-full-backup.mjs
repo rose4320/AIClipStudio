@@ -72,8 +72,9 @@ try {
   await restored.locator('#restoreFullBackupFile').setInputFiles({
     name: 'stage1-test.tar', mimeType: 'application/x-tar', buffer: archive
   });
-  await restored.getByText('Stage1 test asset', { exact: true }).waitFor({ timeout: 15000 });
   await restored.waitForFunction(() => document.querySelector('#saveStatus')?.textContent === 'バックアップ復元済み');
+  await restored.locator('[data-tab="assets"]').click();
+  await restored.getByText('Stage1 test asset', { exact: true }).waitFor({ timeout: 15000 });
   const afterRestore = await dbSnapshot(restored);
   assert.deepEqual(afterRestore, beforeExport, 'restored image and history stores must match the source');
   const restoredProjectData = await restored.evaluate(() => JSON.parse(localStorage.getItem('aiclip_v02')));
