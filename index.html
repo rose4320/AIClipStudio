@@ -24,7 +24,9 @@ function editAsset(id){
 }
 async function deleteAsset(id){
  const a=data.assets.find(x=>x.id===id);if(!a||!confirm('「'+a.name+'」を削除しますか？'))return;
- data.assets=data.assets.filter(x=>x.id!==id);try{await deleteCurrentImage(id)}catch(e){alert('作品情報は削除しましたが、画像データの整理に失敗しました。後で再試行してください')}persist();renderAssets();
+ if(a.hasImage&&!db){alert('画像データベースに接続できないため削除を中止しました。再読み込み後にもう一度お試しください。');return}
+ try{if(a.hasImage)await deleteCurrentImage(id)}catch(e){alert('画像データを削除できなかったため、アセット情報は残しました。再読み込み後にもう一度お試しください。');return}
+ data.assets=data.assets.filter(x=>x.id!==id);persist();renderAssets();
 }
 $('bulkAssetImages').onclick=()=>$('bulkAssetFiles').click();
 $('bulkAssetFiles').onchange=async e=>{
