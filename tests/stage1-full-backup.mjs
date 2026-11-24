@@ -64,6 +64,9 @@ try {
   assert.equal(beforeExport.imageCount, 1, 'expected one current image');
   assert.equal(beforeExport.historyCount, 1, 'expected one replaced-image history record');
 
+  // The full-backup export control is injected into the Projects screen toolbar.
+  await page.locator('[data-tab="projects"]').click();
+  await page.locator('#exportFullBackup').waitFor({ state: 'visible' });
   await page.locator('#exportFullBackup').click();
   await page.waitForFunction(() => window.__aiclipTestTarBlob instanceof Blob, null, { timeout: 15000 });
   const archiveBase64 = await page.evaluate(async () => {
