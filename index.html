@@ -114,7 +114,7 @@ $('mergeFile').onchange=async e=>{
  const file=e.target.files[0];if(!file)return;
  try{
    const x=JSON.parse(await file.text());validateImport(x);
-   const details='取り込み候補：作品 '+x.projects.length+'件、アセット '+x.assets.length+'件\\n既存作品は削除しません。タイトルが同じ作品は統合します。\\n既存の設定文は上書きせず、空欄だけ補完します。\\n画像ファイルは含まれません。\\n\\n続行しますか？';
+   const details='取り込み候補：作品 '+x.projects.length+'件、アセット '+x.assets.length+'件\n既存作品は削除しません。タイトルが同じ作品は統合します。\n既存の設定文は上書きせず、空欄だけ補完します。\n画像ファイルは含まれません。\n\n続行しますか？';
    if(confirm(details))importMerge(x);
  }catch(err){alert('JSONを読み込めません：'+err.message)}
  finally{e.target.value=''}
@@ -135,7 +135,7 @@ $('mergeFile').onchange=async e=>{
  const enc=new TextEncoder();
  function tarOctal(value,length){
    const s=Math.max(0,Number(value)||0).toString(8);
-   return (s.padStart(length-1,'0')+'\\0').slice(-(length));
+   return (s.padStart(length-1,'0')+'\0').slice(-(length));
  }
  function tarHeader(path,size,mtime){
    const nameBytes=enc.encode(path);
@@ -149,10 +149,10 @@ $('mergeFile').onchange=async e=>{
    h.set(enc.encode(tarOctal(Math.floor(mtime/1000),12)),136);
    h.fill(32,148,156);
    h[156]=48;
-   h.set(enc.encode('ustar\\0'),257);
+   h.set(enc.encode('ustar\0'),257);
    h.set(enc.encode('00'),263);
    let sum=0;for(const b of h)sum+=b;
-   h.set(enc.encode(sum.toString(8).padStart(6,'0')+'\\0 '),148);
+   h.set(enc.encode(sum.toString(8).padStart(6,'0')+'\0 '),148);
    return h;
  }
  function tarEntry(path,blob,mtime){
@@ -218,8 +218,8 @@ $('mergeFile').onchange=async e=>{
      tarParts.push(new Uint8Array(1024));
      const archive=new Blob(tarParts,{type:'application/x-tar'});
      download(archive,'aiclip-full-backup-'+new Date().toISOString().slice(0,10)+'.tar');
-     alert('完全バックアップを書き出しました。\\n作品: '+manifest.counts.projects+'件\\nアセット: '+manifest.counts.assets+'件\\n現行画像: '+manifest.counts.currentImages+'件\\n画像履歴: '+manifest.counts.historyImages+'件\\nファイルサイズ: '+(archive.size/1024/1024).toFixed(1)+' MB');
-   }catch(err){console.error(err);alert('完全バックアップを作成できませんでした。\\n'+(err.message||String(err)));}
+     alert('完全バックアップを書き出しました。\n作品: '+manifest.counts.projects+'件\nアセット: '+manifest.counts.assets+'件\n現行画像: '+manifest.counts.currentImages+'件\n画像履歴: '+manifest.counts.historyImages+'件\nファイルサイズ: '+(archive.size/1024/1024).toFixed(1)+' MB');
+   }catch(err){console.error(err);alert('完全バックアップを作成できませんでした。\n'+(err.message||String(err)));}
    finally{btn.disabled=false;btn.textContent=old}
  };
 })();
