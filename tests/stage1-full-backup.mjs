@@ -148,9 +148,13 @@ try {
   });
   const abortBefore = await dbSnapshot(abortPage);
   const abortDataBefore = await abortPage.evaluate(() => localStorage.getItem('aiclip_v02'));
+  const abortConfirm = abortPage.waitForEvent('dialog');
+  const abortError = abortPage.waitForEvent('dialog');
   await abortPage.locator('#restoreFullBackupFile').setInputFiles({
     name: 'stage1-test.tar', mimeType: 'application/x-tar', buffer: archive
   });
+  await abortConfirm;
+  await abortError;
   await abortPage.waitForFunction(() => document.querySelector('#saveStatus')?.textContent === '保存領域準備完了' ||
     document.querySelector('#saveStatus')?.textContent === 'ローカル保存' ||
     document.querySelector('#saveStatus')?.textContent === '保存済み', null, { timeout: 15000 });
@@ -187,10 +191,13 @@ try {
   });
   const quotaBefore = await dbSnapshot(quotaPage);
   const quotaDataBefore = await quotaPage.evaluate(() => localStorage.getItem('aiclip_v02'));
+  const quotaConfirm = quotaPage.waitForEvent('dialog');
+  const quotaError = quotaPage.waitForEvent('dialog');
   await quotaPage.locator('#restoreFullBackupFile').setInputFiles({
     name: 'stage1-test.tar', mimeType: 'application/x-tar', buffer: archive
   });
-  await quotaPage.waitForFunction(() => document.querySelector('#saveStatus')?.textContent !== 'バックアップ復元中…', null, { timeout: 15000 }).catch(() => {});
+  await quotaConfirm;
+  await quotaError;
   assert.deepEqual(await dbSnapshot(quotaPage), quotaBefore, 'quota failure must roll back destination blobs');
   assert.equal(await quotaPage.evaluate(() => localStorage.getItem('aiclip_v02')), quotaDataBefore,
     'quota failure must restore destination project JSON');
