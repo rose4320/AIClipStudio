@@ -357,13 +357,9 @@ $('mergeFile').onchange=async e=>{
    const images=tx.objectStore('images'),history=tx.objectStore('assetImageVersions');
    images.clear();history.clear();
    let remaining=2;
-   const done=()=>{
-     remaining--;
-     if(remaining===0){
-       tx.objectStore('restoreBackupImages').clear();
-       tx.objectStore('restoreBackupHistory').clear();
-     }
-   };
+   // Keep the staged copies until both the IndexedDB rollback and localStorage rollback succeed.
+   // If localStorage restoration fails, the journal and staged copies must remain for the next launch.
+   const done=()=>{remaining--};
    copyCursor(tx.objectStore('restoreBackupImages'),images,tx,done);
    copyHistoryCursor(tx.objectStore('restoreBackupHistory'),history,tx,done);
    await txDone(tx);
