@@ -202,6 +202,7 @@ try {
   });
   await quotaConfirm;
   await quotaError;
+  assert.equal(await quotaPage.evaluate(() => window.__quotaInjectionCount), 1, 'quota fault must be injected exactly once');
   assert.deepEqual(await dbSnapshot(quotaPage), quotaBefore, 'quota failure must roll back destination blobs');
   assert.equal(await quotaPage.evaluate(() => localStorage.getItem('aiclip_v02')), quotaDataBefore,
     'quota failure must restore destination project JSON');
